@@ -40,6 +40,22 @@ export interface DoneMeta {
   retrievalTraceId?: string | null
 }
 
+// --- Memory Build Job (P5-A 全量记忆构建) ---
+
+export type MemoryBuildStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'PARTIAL_FAILED' | 'CANCELLED'
+
+export interface MemoryBuildJob {
+  jobId: string
+  novelId: string
+  status: MemoryBuildStatus
+  totalChapters: number
+  successChapters: number
+  failedChapters: number
+  currentOrdinal: number
+  progress: number
+  failedOrdinals: number[]
+}
+
 // --- Runtime LLM Config (P4-UI-E 后续) ---
 
 /** 安全视图：绝不含 apiKey 明文，只有 apiKeyConfigured 布尔。 */
@@ -159,4 +175,98 @@ export interface MemoryOverview {
     events: number
     totalDurationMs: number
   }
+}
+
+// --- Continuation Modes (P6 续写模式) ---
+
+/** 三种叙事策略：剧情选择 / 完结 / 拓展（与后端 ContinuationMode 枚举一一对应）。 */
+export type ContinuationMode = 'PLOT_CHOICE' | 'ENDING' | 'EXPANSION'
+
+export type PlanStatus = 'DRAFT' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED'
+
+export type PlotThreadStatus = 'OPEN' | 'RESOLVED' | 'ABANDONED'
+
+export interface PlanStep {
+  index: number
+  title: string
+  summary: string
+  phaseGoal: string
+}
+
+export interface EndingThread {
+  title: string
+  summary: string
+  resolution: string
+  firstSeenChapter: number | null
+  relatedCharacters: string[]
+}
+
+export interface CharacterArc {
+  name: string
+  arc: string
+}
+
+/** ENDING 模式的完结分析（规划层数据，非 Canon）。 */
+export interface EndingAnalysis {
+  mainArc: string | null
+  characterArcs: CharacterArc[]
+  foreshadowing: string[]
+  worldState: string | null
+  droppableSubplots: string[]
+  finalConflict: string | null
+  endingDirection: string | null
+  threads: EndingThread[]
+}
+
+/** 剧情计划：规划与正文生成的边界；确认后才用于生成，绝不自动写入 Story Memory。 */
+export interface StoryPlan {
+  planId: string
+  novelId: string
+  mode: ContinuationMode
+  title: string | null
+  summary: string | null
+  goal: string | null
+  expectedArc: string | null
+  steps: PlanStep[]
+  relatedCharacters: string[]
+  relatedThreads: string[]
+  relatedEvents: string[]
+  userInstruction: string | null
+  analysis: EndingAnalysis | null
+  status: PlanStatus
+  createdAt: string
+  updatedAt: string
+}
+
+/** 候选剧情方向（临时数据，不持久化）。 */
+export interface PlanDirection {
+  title: string
+  summary: string
+  rationale: string | null
+  involvedCharacters: string[]
+  relatedThreads: string[]
+  relatedWorldElements: string[]
+  possibleConflict: string | null
+  newConflict: string | null
+  directionGoal: string | null
+}
+
+export interface PlotThread {
+  id: string
+  novelId: string
+  title: string
+  summary: string | null
+  status: PlotThreadStatus
+  firstSeenChapter: number | null
+  lastSeenChapter: number | null
+  relatedCharacters: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChapterCreated {
+  ordinal: number
+  chapterNo: number | null
+  title: string
+  charCount: number
 }

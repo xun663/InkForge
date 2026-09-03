@@ -20,9 +20,13 @@ yarn-error.log*
 *.ipr
 *.iws
 .vscode/
+.cursor/
 .classpath
 .project
 .settings/
+
+# --- Local scratch / capture scripts ---
+.tmp-run/
 
 # --- OS ---
 .DS_Store

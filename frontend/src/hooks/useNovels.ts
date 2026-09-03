@@ -1,18 +1,42 @@
-import { useCallback, useState } from 'react'
-import { uploadNovel } from '../api'
+import { useCallback, useEffect, useState } from 'react'
+import { listNovels, uploadNovel } from '../api'
 import type { NovelSummary } from '../types'
 
 /**
- * 小说列表状态（会话内）。
- *
- * 已知后端缺口：`GET /api/novels`（列表端点）当前不存在——只有上传 / 单查 / 章节 / 断点。
- * 因此本 hook 维护"本次会话已导入"的本地列表；跨会话持久列表需后端增量（已记录，不在此实现）。
+ * 小说列表：启动时拉 GET /api/novels（含服务端重放导入的蛊真人），上传成功后再并入。
  */
 export function useNovels() {
   const [novels, setNovels] = useState<NovelSummary[]>([])
   const [activeNovelId, setActiveNovelId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    listNovels()
+      .then((items) => {
+        if (cancelled) return
+        setNovels(items)
+        setActiveNovelId((current) => {
+          if (current && items.some((n) => n.id === current)) return current
+          const preferred = items.reduce<NovelSummary | null>(
+            (best, n) => (best == null || n.chapterCount > best.chapterCount ? n : best),
+            null,
+          )
+          return preferred?.id ?? null
+        })
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   /** 导入小说：上传成功 → 加入列表 → 设为当前。返回导入结果。 */
   const importNovel = useCallback(async (file: File): Promise<NovelSummary> => {

@@ -59,15 +59,18 @@ InkForge/
 
 ```text
 com.inkforge
-├── novel/        小说生命周期：上传、解析、查询（NovelRepository 接口 + InMemory 实现）
+├── novel/        小说生命周期：上传、解析、查询、保存续写章节（NovelRepository 接口 + InMemory 实现）
 ├── chapter/      章节：编码检测、规则切分、中文数字解析
 ├── context/      断点分析、Prompt Context 构建（预算作为参数传入，不硬编码）
-├── generation/   续写编排、GenerationLog（用量/成本/延迟）
+├── generation/   续写编排、GenerationLog（用量/成本/延迟/模式/计划）
 ├── provider/     LlmProvider 抽象（OpenAI 兼容 + Mock），P3 扩展 Embedding/Reranker
+├── memory/       P2 Story Memory：摘要/人物/事实/事件、提取校验、确定性合并、全量构建 Job
+├── retrieval/    P3 Hybrid Retrieval：BM25+Vector→RRF→Reranker、Query 构造、Trace
+├── planning/     P6 续写模式：ContinuationMode/StoryPlan/PlotThread 剧情规划层（与 Memory 严格隔离）
 └── common/       TokenCounter、PromptCatalog、SSE 工具、全局异常处理
 ```
 
-`memory/`、`retrieval/`、`consistency/` 包在对应 Phase 落地，扩展点见下节。
+`consistency/` 等后续包在对应 Phase 落地，扩展点见下节。
 
 ## 5. 后续 Phase 扩展点（Phase 1 预留，不提前实现）
 

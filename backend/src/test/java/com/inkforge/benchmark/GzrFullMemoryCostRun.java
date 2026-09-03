@@ -63,6 +63,8 @@ import java.util.regex.Pattern;
  *   <li><b>检查点</b>：每节提取结果写 {@code <temp>/gzr_cost/outcomes/chapter-&lt;k&gt;.json}
  *       （{@link ChapterExtractionResult} JSON + 估算 tokens + 耗时）；已成功则跳过 → 可停可续、跨会话安全。</li>
  *   <li><b>分批</b>：{@code -DGZR_MAX=n} 一次最多处理 n 节（默认 300），跑完一批再跑一批。</li>
+ *   <li><b>并行</b>：{@code -DGZR_PAR=n}（默认 1）。实测：单路 LLM ≈12s/章；4 路约 3×、≈12 章/分钟。
+ *       只并行写 outcomes；重放合并记忆仍按 ordinal 串行。</li>
  *   <li><b>成本计量</b>：用 CountingLlmProvider 装饰 deepseek，逐次估算输入/输出 tokens（jtokkit），累计写 stats。</li>
  *   <li><b>buildAndContinue</b>：全部提取完成后，把结果重放建记忆→投影→BGE 嵌入→检索→末节后续写。</li>
  * </ul>

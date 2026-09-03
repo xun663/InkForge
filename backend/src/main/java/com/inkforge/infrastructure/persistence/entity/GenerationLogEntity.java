@@ -47,6 +47,14 @@ public class GenerationLogEntity {
     @Column(name = "type")
     private String type;
 
+    /** P6 规划元数据：续写模式（可空，旧记录为 NULL）。 */
+    @Column(name = "mode")
+    private String mode;
+
+    /** P6 规划元数据：关联的 StoryPlan（可空）。 */
+    @Column(name = "plan_id", length = 64)
+    private String planId;
+
     @Column(name = "created_at")
     private Instant createdAt;
 
@@ -136,6 +144,22 @@ public class GenerationLogEntity {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public String getMode() {
+        return mode;
+    }
+
+    public void setMode(String mode) {
+        this.mode = mode;
+    }
+
+    public String getPlanId() {
+        return planId;
+    }
+
+    public void setPlanId(String planId) {
+        this.planId = planId;
     }
 
     public Instant getCreatedAt() {

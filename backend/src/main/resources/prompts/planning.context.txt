@@ -1,0 +1,14 @@
+【断点章节】
+{{breakpoint}}
+
+【故事状态】
+{{storyState}}
+
+【未解决剧情线】
+{{openThreads}}
+
+【检索到的相关记忆】
+{{retrieved}}
+
+【用户要求】
+{{userInstruction}}

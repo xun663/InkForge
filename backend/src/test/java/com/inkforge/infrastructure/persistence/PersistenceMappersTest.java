@@ -13,6 +13,8 @@ import com.inkforge.memory.MemoryExtractionStats;
 import com.inkforge.memory.StoryEvent;
 import com.inkforge.memory.SummaryCharacter;
 import com.inkforge.novel.Novel;
+import com.inkforge.planning.PlotThread;
+import com.inkforge.planning.StoryPlan;
 import com.inkforge.provider.LlmUsage;
 import org.junit.jupiter.api.Test;
 
@@ -109,5 +111,53 @@ class PersistenceMappersTest {
         GenerationLog back = GenerationLogMappers.toDomain(GenerationLogMappers.toEntity(domain));
 
         assertThat(back).isEqualTo(domain);
+    }
+
+    @Test
+    void generationLogRoundTripWithPlanningMetadata() {
+        GenerationLog domain = new GenerationLog("g2", "n1", "mock", "inkforge-mock",
+                878, 245, 27L, new BigDecimal("0.0056"), "SUCCESS", null,
+                "PLANNING", "ENDING", "p1", NOW);
+
+        GenerationLog back = GenerationLogMappers.toDomain(GenerationLogMappers.toEntity(domain));
+
+        assertThat(back).isEqualTo(domain);
+        assertThat(back.mode()).isEqualTo("ENDING");
+        assertThat(back.planId()).isEqualTo("p1");
+    }
+
+    @Test
+    void storyPlanRoundTrip() {
+        StoryPlan domain = new StoryPlan("p1", "n1", com.inkforge.planning.ContinuationMode.ENDING,
+                "以终局战作结", "魔门战争决战", "林默对血魔", "终结血魔",
+                List.of(new com.inkforge.planning.PlanStep(0, "揭示剑穗", "回溯恩怨", "收束伏笔"),
+                        new com.inkforge.planning.PlanStep(1, "最终决战", "决战", "主线收束")),
+                List.of("林默"), List.of("血魔行踪成谜"), List.of(), "尽快收束",
+                new com.inkforge.planning.EndingAnalysis("魔门战争决战",
+                        List.of(new com.inkforge.planning.EndingAnalysis.CharacterArc("林默", "成长弧")),
+                        List.of("剑穗来历"), "大战在即", List.of("采药支线"),
+                        "林默对血魔", "终结血魔",
+                        List.of(new com.inkforge.planning.EndingAnalysis.EndingThread(
+                                "血魔行踪成谜", "败退后去向不明", "决战揭露", 1, List.of("血魔")))),
+                com.inkforge.planning.PlanStatus.DRAFT, NOW, NOW);
+
+        StoryPlan back = PlanningMappers.toDomain(PlanningMappers.toEntity(domain));
+
+        assertThat(back).isEqualTo(domain);
+    }
+
+    @Test
+    void plotThreadRoundTripWithWhitespaceNormalization() {
+        PlotThread domain = new PlotThread("t1", "n1", "血魔行踪成谜", "败退后去向不明",
+                com.inkforge.planning.PlotThreadStatus.OPEN, 1, 6, List.of("血魔"), NOW, NOW);
+
+        PlotThread back = PlanningMappers.toDomain(PlanningMappers.toEntity(domain));
+
+        assertThat(back).isEqualTo(domain);
+        // 映射派生归一化键（用于 upsert 匹配与唯一索引）
+        com.inkforge.infrastructure.persistence.entity.PlotThreadEntity entity =
+                PlanningMappers.toEntity(domain);
+        assertThat(entity.getTitleNormalized())
+                .isEqualTo(PlotThread.normalized("血魔行踪成谜"));
     }
 }

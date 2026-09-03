@@ -4,6 +4,7 @@ import Drawer from '../common/Drawer'
 import ErrorState from '../common/ErrorState'
 import EmptyState from '../common/EmptyState'
 import RetrievalTracePanel from '../retrieval/RetrievalTracePanel'
+import SaveChapterButton from './SaveChapterButton'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 
 export type GenStage = 'idle' | 'ready' | 'generating' | 'done'
@@ -16,6 +17,7 @@ interface GenerationStatusProps {
   novelId: string | null
   showTrace: boolean
   onToggleTrace: (value?: boolean) => void
+  onChapterSaved?: () => void
 }
 
 /**
@@ -31,6 +33,7 @@ export default function GenerationStatus({
   novelId,
   showTrace,
   onToggleTrace,
+  onChapterSaved,
 }: GenerationStatusProps) {
   const compact = useMediaQuery('(max-width: 820px)')
   const hasTrace = doneMeta != null && doneMeta.retrievalTraceId != null && (doneMeta.retrievedCount ?? 0) > 0
@@ -68,6 +71,10 @@ export default function GenerationStatus({
       )}
 
       {error && <ErrorState message={error} />}
+
+      {stage === 'done' && !error && output.trim() && (
+        <SaveChapterButton novelId={novelId} content={output} onSaved={() => onChapterSaved?.()} />
+      )}
 
       {hasTrace && novelId && doneMeta && (
         <>

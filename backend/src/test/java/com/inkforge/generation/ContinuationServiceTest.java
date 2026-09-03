@@ -56,7 +56,10 @@ class ContinuationServiceTest {
                 new ContextProperties(8192, 2000, Map.of()),
                 new GenerationProperties(2048, 0.8),
                 llmProvider, logRepository,
-                new CostCalculator(new CostProperties(Map.of())));
+                new CostCalculator(new CostProperties(Map.of())),
+                new com.inkforge.planning.InMemoryStoryPlanRepository(),
+                new com.inkforge.common.JtokkitTokenCounter(),
+                new com.inkforge.planning.PlanPromptRenderer(new com.inkforge.common.prompt.ClasspathPromptCatalog()));
     }
 
     private static Flux<ProviderStreamEvent> okStream() {

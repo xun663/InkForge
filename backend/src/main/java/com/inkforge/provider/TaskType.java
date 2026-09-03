@@ -4,5 +4,6 @@ package com.inkforge.provider;
 public enum TaskType {
     CONTINUATION,
     MEMORY_EXTRACTION,
-    RERANK
+    RERANK,
+    PLANNING
 }

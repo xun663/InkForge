@@ -39,6 +39,10 @@ inkforge:
     max-file-size: 104857600    # 100MB (长篇网文如《蛊真人》可达数百万字/数十MB)
     max-chapters: 10000
     max-chapter-chars: 100000
+  gzr:
+    # 全量记忆重放（POST /api/import/gzr-outcomes）。不调用 LLM；空则请求体必须提供路径。
+    source-txt: ${INKFORGE_GZR_SOURCE:}
+    outcomes-dir: ${INKFORGE_GZR_DIR:}
   llm:
     # Default provider is "mock": the full Phase 1 flow works without any API key.
     # Switch to "deepseek" / "openai" / "ollama" / "openai-compatible" via env vars, see README.
@@ -69,13 +73,21 @@ inkforge:
   generation:
     max-output-tokens: 2048
     temperature: 0.8
+  planning:
+    # P6 Continuation Modes 剧情规划。temperature 故意低于正文续写（要求稳定与克制）；
+    # plan-token-reserve 是正文生成时为计划附录预留的上下文预算上限。
+    max-output-tokens: 2048
+    temperature: 0.3
+    max-retries: 2
+    plan-token-reserve: 512
+    direction-count: 3
   retrieval:
     # P3-D Hybrid Retrieval: BM25(top K) + Vector(top K) → RRF(k) → Reranker(top K).
     # reranker: passthrough (default, deterministic, zero-LLM) | llm (optional, Mock works).
     bm25-top-k: 30
     vector-top-k: 30
     fusion-top-k: 30
-    rerank-top-k: 8
+    rerank-top-k: 30
     rrf-k: 60
     reranker: ${INKFORGE_RERANKER:passthrough}
     rerank-max-candidates: 15
@@ -88,7 +100,7 @@ inkforge:
     # before deciding how much chapter text fits.
     extraction-input-budget: 12000
     extraction-reserved-output-tokens: 2048
-    extraction-max-output-tokens: 2048
+    extraction-max-output-tokens: 4096
     extraction-temperature: 0.2
     max-retries: 2
     confirm-confidence: 0.7

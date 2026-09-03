@@ -3,15 +3,21 @@
 章节：第{{chapterNo}}章 《{{chapterTitle}}》
 
 提取要求：
-1. summary：2-4 句客观概括本章剧情；keyEvents 按发生顺序列出关键事件；unresolvedThreads 列出本章尚未解决的线索（没有则为空数组）。
+1. summary：**必须非空**，用 2-4 句客观概括本章剧情；keyEvents 按发生顺序列出关键事件；unresolvedThreads 列出本章尚未解决的线索（没有则为空数组）。
 2. characters：只提取本章实际出场或明确被提及的角色（最多 12 个），每人给出 facts：
+   - **每个 character 的 facts 必须至少包含一条**（除非该角色确实没有任何可提取信息）
    - category 只能取：IDENTITY / ABILITY / AFFILIATION / POSSESSION / STATE / RELATIONSHIP / APPEARANCE / PERSONALITY / OTHER
    - attribute 使用规范词表：身份 / 境界 / 所属势力 / 当前状态 / 武器 / 性格 / 外貌 / 关系 / 其他（"修为、实力"一律写"境界"，"宗门、门派、势力"一律写"所属势力"）
    - value 简短明确（不超过 20 字）；confidence 取 0-1（事实明确 = 0.9 以上；传闻、猜测、暗示 = 0.3-0.6）
    - RELATIONSHIP 类事实必须填写 targetCharacter（关系对象的名字），value 写关系类型（敌对/合作/利用/师徒/……）；同一角色对不同对象的关系要分条列出
-   - sourceQuote 必须逐字引用本章原文中支持该事实的句子（不超过 300 字）
+   - sourceQuote 必须逐字引用本章原文中支持该事实的句子（不超过 300 字），**每条 fact 都必须有 sourceQuote，不可省略**
 3. events：本章重要剧情事件，importance 取 1-5，同样给出 sourceQuote。
 4. 未提及的字段输出空数组，不要编造原文中不存在的内容。
+
+完整性要求（务必遵守）：
+- summary、characters、events 三个字段**都必须出现在 JSON 中**，缺一不可。
+- 不要为了缩短输出而省略 facts、events 或 sourceQuote；完整输出可以较长。
+- 不要用空字符串代替 summary；不要用空 facts 数组代替真实存在的事实。
 
 输出 JSON 格式（严格遵循，字段不可省略）：
 {{schema}}

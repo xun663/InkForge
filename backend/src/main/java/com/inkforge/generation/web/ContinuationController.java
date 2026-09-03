@@ -7,6 +7,8 @@ import com.inkforge.generation.GenerationEvent;
 import com.inkforge.generation.GenerationLog;
 import com.inkforge.generation.GenerationLogRepository;
 import com.inkforge.generation.GenerationOptions;
+import com.inkforge.planning.ContinuationIntent;
+import com.inkforge.planning.ContinuationMode;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -52,9 +54,15 @@ public class ContinuationController {
         GenerationOptions options = request == null
                 ? new GenerationOptions(null, null)
                 : new GenerationOptions(request.maxOutputTokens(), request.temperature());
+        // P6：mode 用字符串接收（手动解析 → 未知值走 400，避免枚举反序列化异常漏成 500）；
+        // mode/planId 均空 = legacy 续写，行为与 P5 字节级一致
+        ContinuationIntent intent = request == null ? ContinuationIntent.legacy()
+                : new ContinuationIntent(
+                        request.mode() == null ? null : ContinuationMode.parse(request.mode()),
+                        request.planId(), request.stepIndex(), request.userInstruction());
 
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
-        Disposable subscription = continuationService.streamContinuation(novelId, options)
+        Disposable subscription = continuationService.streamContinuation(novelId, options, intent)
                 .subscribe(
                         event -> emit(emitter, event),
                         error -> {
@@ -91,6 +99,13 @@ public class ContinuationController {
         }
     }
 
-    public record ContinuationRequestDto(Integer maxOutputTokens, Double temperature) {
+    /**
+     * P6 起支持规划字段：mode（PLOT_CHOICE/ENDING/EXPANSION，字符串手动解析）、
+     * planId（已确认的 StoryPlan）、stepIndex（ENDING 的当前阶段，0 基）、userInstruction。
+     * 全部可空；mode+planId 均空 = 旧版直接续写。
+     */
+    public record ContinuationRequestDto(Integer maxOutputTokens, Double temperature,
+                                         String mode, String planId,
+                                         Integer stepIndex, String userInstruction) {
     }
 }

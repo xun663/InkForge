@@ -22,6 +22,8 @@ public final class GenerationLogMappers {
         entity.setStatus(log.status());
         entity.setErrorMessage(log.errorMessage());
         entity.setType(log.type());
+        entity.setMode(log.mode());
+        entity.setPlanId(log.planId());
         entity.setCreatedAt(log.createdAt());
         return entity;
     }
@@ -31,6 +33,7 @@ public final class GenerationLogMappers {
                 entity.getGenerationId(), entity.getNovelId(), entity.getProvider(),
                 entity.getModel(), entity.getPromptTokens(), entity.getCompletionTokens(),
                 entity.getLatencyMs(), entity.getEstimatedCostUsd(), entity.getStatus(),
-                entity.getErrorMessage(), entity.getType(), entity.getCreatedAt());
+                entity.getErrorMessage(), entity.getType(), entity.getMode(), entity.getPlanId(),
+                entity.getCreatedAt());
     }
 }

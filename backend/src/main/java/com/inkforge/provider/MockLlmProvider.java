@@ -85,6 +85,7 @@ public class MockLlmProvider implements LlmProvider {
         return switch (request.taskType()) {
             case MEMORY_EXTRACTION -> buildExtractionJson(request);
             case RERANK -> buildRerankJson(request);
+            case PLANNING -> buildPlanningJson(request);
             case CONTINUATION -> MOCK_PASSAGE;
         };
     }
@@ -189,6 +190,66 @@ public class MockLlmProvider implements LlmProvider {
             throw new IllegalStateException("Mock extraction JSON 序列化失败", e);
         }
     }
+
+    /**
+     * Canned PLANNING response：按用户提示词中的【规划模式：…】标记区分三种模式。
+     * 完结模式返回单对象（EndingPlan 形状）；剧情选择/拓展返回方向数组。
+     * 人物与 MOCK_PASSAGE 世界一致（林默/血魔/天剑宗），标题含空白以验证归一化合并。
+     */
+    private String buildPlanningJson(LlmRequest request) {
+        String userContent = request.messages().stream()
+                .filter(m -> "user".equals(m.role()))
+                .map(ChatMessage::content)
+                .reduce("", (a, b) -> b);
+        if (userContent.contains("【规划模式：完结】")) {
+            return PLANNING_ENDING_JSON;
+        }
+        return PLANNING_DIRECTIONS_JSON;
+    }
+
+    private static final String PLANNING_DIRECTIONS_JSON = """
+            [
+              {"title":"调查青云城 失踪事件","summary":"继续当前城市线，调查近期出现的连续失踪案件。",
+               "rationale":"与当前章节留下的悬念直接相关。",
+               "involvedCharacters":["林默","血魔"],"relatedThreads":["失踪案背后主使"],
+               "relatedWorldElements":["青云城"],"possibleConflict":"可能触发与天魔宗的正面冲突。",
+               "newConflict":null,"directionGoal":"揭开失踪案真相"},
+              {"title":"黑衣人再次现身","summary":"夜袭的黑衣人重新出现，目标直指玄霜剑。",
+               "rationale":"延续昨夜交战留下的敌人线索。",
+               "involvedCharacters":["林默"],"relatedThreads":[],"relatedWorldElements":[],
+               "possibleConflict":null,"newConflict":"黑衣人身份成谜，敌友难辨。","directionGoal":"查明黑衣人来历"},
+              {"title":"开启青云秘境","summary":"后山遗迹异动，秘境入口显现。",
+               "rationale":"世界空间尚未开发，适合拓展新篇。",
+               "involvedCharacters":["林默"],"relatedThreads":[],"relatedWorldElements":["青云秘境","上古遗迹"],
+               "possibleConflict":null,"newConflict":"秘境中的势力与传承之争。","directionGoal":"开启新地图与新机缘"}
+            ]
+            """;
+
+    private static final String PLANNING_ENDING_JSON = """
+            {
+              "mainArc":"魔门战争进入决战阶段",
+              "characterArcs":[{"name":"林默","arc":"从受伤弟子成长为独当一面的剑客"}],
+              "foreshadowing":["第1章遗落的剑穗来历未明"],
+              "worldState":"天剑宗与魔门对峙，大战一触即发",
+              "droppableSubplots":["后山采药支线"],
+              "finalConflict":"林默与血魔的最终对决",
+              "endingDirection":"以林默亲手终结血魔、重铸玄霜剑作结",
+              "threads":[
+                {"title":"血魔逃离后的 行动未知","summary":"血魔败退后行踪成谜",
+                 "resolution":"最终决战中揭露血魔巢穴","firstSeenChapter":1,
+                 "relatedCharacters":["血魔"]},
+                {"title":"林默右手伤势尚未恢复","summary":"伤势影响战力",
+                 "resolution":"决战前痊愈并突破","firstSeenChapter":1,
+                 "relatedCharacters":["林默"]}
+              ],
+              "steps":[
+                {"index":1,"title":"揭示剑穗与血魔的渊源","summary":"回溯血魔与玄霜剑的恩怨","phaseGoal":"收束兵器伏笔"},
+                {"index":2,"title":"林默伤愈并突破","summary":"闭关疗伤，突破境界","phaseGoal":"完成人物弧"},
+                {"index":3,"title":"最终决战","summary":"林默与血魔决战于后山","phaseGoal":"主线收束"},
+                {"index":4,"title":"尾声","summary":"大战落幕，新的平静","phaseGoal":"结局"}
+              ]
+            }
+            """;
 
     /** First sentence-ish substring of the chapter, capped at maxLen chars. */
     private static String firstSentence(String text, int maxLen) {

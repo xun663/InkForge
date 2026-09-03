@@ -39,6 +39,10 @@ class NovelControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.chapterCount").value(6));
 
+        mockMvc.perform(get("/api/novels"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id=='%s')].chapterCount".formatted(novelId)).value(6));
+
         mockMvc.perform(get("/api/novels/{id}/chapters", novelId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(6))
@@ -111,9 +115,9 @@ class NovelControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("not_found"));
 
-        // path exists but the method is unsupported → 405, never 500
         mockMvc.perform(get("/api/novels"))
-                .andExpect(status().isMethodNotAllowed());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
 
         mockMvc.perform(get("/api/novels/no-such-id/breakpoint"))
                 .andExpect(status().isNotFound());

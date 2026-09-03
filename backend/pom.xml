@@ -139,6 +139,10 @@
 						<include>**/*Tests.java</include>
 						<include>**/*IT.java</include>
 					</includes>
+					<excludes>
+						<!-- 真实 LLM 成本 harness，必须 -Dtest='GzrFullMemoryCostRun#方法名' 才跑 -->
+						<exclude>**/GzrFullMemoryCostRun.java</exclude>
+					</excludes>
 				</configuration>
 			</plugin>
 		</plugins>

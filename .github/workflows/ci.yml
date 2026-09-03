@@ -1,4 +1,4 @@
-name: CI
+name: Backend tests
 
 on:
   push:
@@ -18,7 +18,10 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+      # Windows 提交的 mvnw 可能没有可执行位；Linux runner 上 ./mvnw 会秒失败
+      - run: chmod +x mvnw
       # Testcontainers 集成测试在 CI（有 Docker）下会真实执行；本地无 Docker 时自动 skipped
+      # 高成本 harness（GzrFullMemoryCostRun）不匹配 *Test/*IT，不会进默认 surefire
       - run: ./mvnw test
 
   frontend-build:

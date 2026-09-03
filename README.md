@@ -1,5 +1,7 @@
 # InkForge
 
+[![Backend tests](https://github.com/xun663/InkForge/actions/workflows/ci.yml/badge.svg)](https://github.com/xun663/InkForge/actions/workflows/ci.yml)
+
 **Long-Form AI Story Continuation & Narrative Memory Engine**
 面向长文本生成的 AI 小说续写与叙事记忆系统
 

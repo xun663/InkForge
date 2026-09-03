@@ -15,6 +15,51 @@ Novel → Parser → Chapter → Story Memory → MemoryChunk Projection
       → LLM → Generation → Retrieval Trace → (回到 Story Memory)
 ```
 
+## 规模实测：《蛊真人》全书记忆 + 续写
+
+不是 12 章玩具集，是把一部 **2335 节 / 约 730 万字** 的长篇送进同一套管线：结构化提取 → 确定性合并 → 混合检索 → 按计划续写。
+
+| 项 | 实测 |
+|---|---|
+| 分节 | 2335 节（按「第…节」切分，不是默认「章」） |
+| 成功提取 | **2280** 章（fail 55 / 永久跳过 6） |
+| 记忆规模 | **1838** 人物 · **35,629** 条事实 · **5,616** 个事件 |
+| 提取吞吐 | 单路 LLM ≈ **12 秒/章**（先串行 300 章）；**4 路并行约 3×，≈12 章/分钟** |
+| 提取计量 | 内部 jtokkit ≈ **2160 万 tokens** / 墙钟 ≈ **9.3 小时**（含重试） |
+| 账单（昨日高压力提取） | DeepSeek **¥46.07** · 2939 次调用 · 1590 万 tokens |
+| 续写 3 章 | **¥0.04** · 3 次调用 · 15,151 tokens |
+
+LLM 抽章可以并行写检查点；合并进 Story Memory 仍按章节序号串行（`CURRENT` / `SUPERSEDED` 不能乱序）。4 路没有拉满 4 倍，是共享 API 与尾延迟，不是统计注水。
+
+<p align="center">
+  <img src="docs/screenshots/06-workspace-overview.png" alt="工作台：2335 章蛊真人，右侧全书记忆 2280 章 / 1838 人物 / 35629 事实 / 5616 事件" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/05-screenshot-142507.png" alt="记忆中心：方源别名解析与带章号的人物事实" />
+</p>
+
+**记忆提取成本（DeepSeek 控制台，昨日）**
+
+<p align="center">
+  <img src="docs/screenshots/12-gzr-memory-cost.png" alt="蛊真人全本高压力记忆成本：¥46.07 / 2939 次 / 1590 万 tokens" />
+</p>
+
+**续写方式：先规划、后生成**（剧情选择 / 完结 / 拓展；确认前不写正文、不改 Story Memory）
+
+| 三种策略 | 剧情候选方向 |
+|---|---|
+| <img src="docs/screenshots/10-continuation-modes-ui.png" alt="续写方式：剧情选择 / 完结 / 拓展" /> | <img src="docs/screenshots/11-plot-choice.png" alt="剧情选择：三条候选方向卡片" /> |
+| <img src="docs/screenshots/07-expansion-directions.png" alt="拓展：新方向卡片" /> | <img src="docs/screenshots/08-ending-plan.png" alt="完结：分阶段收束方案" /> |
+
+**三章续写成本** · **检索过程可解释**
+
+| 成本 | Trace |
+|---|---|
+| <img src="docs/screenshots/09-continuation-cost.png" alt="续写三章成本：¥0.04 / 3 次 / 15151 tokens" /> | <img src="docs/screenshots/04-generation-trace.png" alt="续写完成：token、模型与检索 Trace" /> |
+
+工作台、记忆中心全貌另见 [`docs/screenshots/01-workspace-gzr.png`](docs/screenshots/01-workspace-gzr.png)、[`02-memory-center.png`](docs/screenshots/02-memory-center.png)、[`03-continuation-modes.png`](docs/screenshots/03-continuation-modes.png)。
+
 ## 系统架构
 
 ```mermaid
@@ -51,15 +96,16 @@ flowchart TD
 
 记忆构建链路：`章节 → LLM 结构化提取（严格校验 + 重试）→ Story Memory（摘要/人物事实三态/事件）→ MemoryChunk 投影 → Embedding → 检索索引`。
 
-## 当前状态：P1-P3 已完成并封版
+## 当前状态
 
 | Phase | 内容 |
 |---|---|
 | **P1** | TXT 解析（GBK/UTF-8）→ 章节切分 → 断点检测 → LLM 续写 → SSE 流式 + GenerationLog |
 | **P2** | Story Memory：章节摘要 / 人物事实（CURRENT / SUPERSEDED / UNCERTAIN 生命周期）/ 剧情事件 / 结构化提取校验 / 确定性合并 / ContextSection 预算 |
 | **P3** | Hybrid Retrieval：MemoryChunk 投影 + Lucene BM25（中文分词）+ Embedding/Vector（pgvector 可选）+ RRF 融合 + Reranker + MultiQuery + Retrieval Trace（可解释检索）+ 前端 Trace 面板 + **Benchmark 消融实验** |
-
-P4 前端产品化（P4-UI-A 设计系统 → P4-UI-F 响应式/无障碍）已完成并封版；后续 Roadmap 见文末。
+| **P4** | 前端产品化：设计系统 / 响应式 / 运行时 LLM 配置 / Retrieval Trace 渐进披露 |
+| **P5** | 检索定稿（Top-K=30 / rank-preserving）+ 全量记忆构建 Job（可暂停/续跑/重试）+ 评测体系（Memory ON/OFF 10 维终评：ON 18.0 vs OFF 15.0，初步部分收益） |
+| **P6** | **续写模式**：剧情选择 / 完结 / 拓展 + StoryPlan 剧情计划层 + PlotThread 线索追踪 + 保存续写为正式章节（详见 [docs/p6-continuation-modes.md](docs/p6-continuation-modes.md)） |
 
 ## 技术栈
 
@@ -110,7 +156,7 @@ npm run dev
 
 ### 3. 完整闭环
 
-上传一个 TXT 小说（UTF-8 或 GBK 均可）→ 查看章节列表与断点 → **建立故事记忆**（可选，见右侧 Story Memory 面板）→ 点击「开始续写」→ 实时看到流式生成结果、token/成本统计，以及「📚 参考了 X 条记忆 · 查看检索过程」（可展开查看 BM25/Vector/RRF/Reranker/Final 各阶段检索链路）。
+上传一个 TXT 小说（UTF-8 或 GBK 均可）→ 查看章节列表与断点 → **建立故事记忆**（可选，见右侧 Story Memory 面板）→ 点击「开始续写」→ **选择续写方式**（🧭 剧情选择 / 🏁 完结 / 🌌 拓展，或 ✍️ 直接续写）→ 实时看到流式生成结果、token/成本统计，以及「📚 参考了 X 条记忆 · 查看检索过程」（可展开查看 BM25/Vector/RRF/Reranker/Final 各阶段检索链路）→ 满意后可「💾 保存为正式章节」（只入正文，不会自动改写故事记忆）。
 
 ## 切换 LLM Provider
 
@@ -208,7 +254,11 @@ cd backend
 | [docs/architecture.md](docs/architecture.md) | 总体架构与 Phase 演进路线 |
 | [docs/phase2-design.md](docs/phase2-design.md) | Story Memory 设计评审（最终版） |
 | [docs/benchmark-results.md](docs/benchmark-results.md) | P3-G 检索消融实验报告 |
+| [docs/p5-c-memory-e2e-ablation.md](docs/p5-c-memory-e2e-ablation.md) | Memory ON/OFF 端到端消融（10 维终评） |
+| [docs/p6-continuation-modes.md](docs/p6-continuation-modes.md) | P6 续写模式：剧情规划层设计与边界 |
+| [docs/problems-log.md](docs/problems-log.md) | 开发问题日志（现象/根因/解决/教训） |
 | [docs/thesis-material.md](docs/thesis-material.md) | 论文/技术报告材料（系统设计 + 实验） |
+| [docs/screenshots/](docs/screenshots/) | 蛊真人全书记忆 / 续写方式 / 成本控制台截图 |
 
 ## Roadmap
 
@@ -217,10 +267,10 @@ cd backend
 | **1** TXT 解析 → 章节切分 → 断点检测 → LLM 续写 → SSE + GenerationLog | ✅ 封版 |
 | **2** Story Memory（摘要 / 人物事实三态 / 事件 / 提取校验 / 确定性合并 / ContextSection） | ✅ 封版 |
 | **3** Hybrid Retrieval（MemoryChunk + BM25 + Vector + RRF + Reranker + MultiQuery + Trace + 前端面板 + Benchmark） | ✅ 封版 |
-| 4 | Context Budget Manager 深化 / Memory 压缩（未开始） |
-| 5 | Consistency Checker（人物/时间线/世界观/关系/物品一致性校验）（未开始） |
-| 6 | Multi-Branch 生成、Timeline、Event Graph、Style Profile、World Memory（未开始） |
-| 7 | 更丰富的记忆管理、更大 Benchmark、真实模型评估（未开始） |
+| **4** 前端产品化（设计系统 / 响应式 / 运行时 LLM 配置 / Trace 渐进披露） | ✅ 封版 |
+| **5** 检索定稿（Top-K=30 / rank-preserving）+ 全量记忆构建 Job + Memory ON/OFF 评测 | ✅ 封版 |
+| **6** 续写模式（剧情选择 / 完结 / 拓展 + StoryPlan / PlotThread 剧情规划层 + 保存正式章节） | ✅ 完成（测试全绿） |
+| 7 | Context Budget 深化 / Memory 压缩 / Consistency Checker / 多分支与事件图（未开始） |
 
 ## Current Status — v0.1.0-alpha
 
@@ -236,6 +286,9 @@ cd backend
 - Responsive UI（桌面 / 笔记本 / 窄屏 + Drawer）✅
 - Reranker abstraction（PassThrough / LLM 可插拔）✅
 - Benchmark（固定数据消融实验）✅
+- 全量记忆构建 Job（后台串行 / 暂停 / 续跑 / 重试 / 失败补齐）✅
+- 续写模式（🧭 剧情选择 / 🏁 完结 / 🌌 拓展：先规划后生成，StoryPlan 确认制）✅
+- 保存续写为正式章节（生成 → 用户确认 → 入 Canon；不自动改写 Story Memory）✅
 
 当前限制：
 

@@ -23,6 +23,8 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
 
     private static final String CHAT_COMPLETIONS_PATH = "/chat/completions";
     private static final String DONE = "[DONE]";
+    /** thinking 参数是 DeepSeek 专属；只对 deepseek provider 发送，避免破坏其他 OpenAI-compatible 端点。 */
+    private static final String DEEPSEEK_NAME = "deepseek";
 
     private final String name;
     private final WebClient webClient;
@@ -83,12 +85,23 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                 .bodyToMono(JsonNode.class)
                 .timeout(Duration.ofSeconds(properties.timeoutSeconds()))
                 .map(node -> {
-                    String content = node.path("choices").path(0).path("message").path("content").asText("");
-                    JsonNode usageNode = node.path("usage");
-                    LlmUsage usage = new LlmUsage(
-                            usageNode.path("prompt_tokens").asInt(0),
-                            usageNode.path("completion_tokens").asInt(0));
-                    return new LlmResponse(content, usage);
+                    // 严格区分 content（最终业务输出）与 reasoning_content（推理内容）。
+                    // reasoning_content 绝不能作为最终答案返回。
+                    JsonNode message = node.path("choices").path(0).path("message");
+                    String content = message.path("content").asText("");
+                    if (!content.isBlank()) {
+                        JsonNode usageNode = node.path("usage");
+                        LlmUsage usage = new LlmUsage(
+                                usageNode.path("prompt_tokens").asInt(0),
+                                usageNode.path("completion_tokens").asInt(0));
+                        return new LlmResponse(content, usage);
+                    }
+                    String reasoning = message.path("reasoning_content").asText("");
+                    if (!reasoning.isBlank()) {
+                        throw new LlmException(
+                                "LLM 返回推理内容但无最终答案（reasoning_content 不能作为最终输出）：请关闭 thinking 模式或重试");
+                    }
+                    throw new LlmException("LLM 返回为空");
                 })
                 .onErrorMap(e -> e instanceof LlmException ? e
                         : new LlmException("LLM provider '" + name + "' request failed: " + e.getMessage(), e))
@@ -130,6 +143,11 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
         body.put("stream", stream);
         if (stream) {
             body.put("stream_options", Map.of("include_usage", true));
+        }
+        // DeepSeek V4 thinking 开关：仅对 deepseek provider 发送，且仅当请求显式指定时。
+        if (DEEPSEEK_NAME.equalsIgnoreCase(name) && request.thinking() != null) {
+            body.put("thinking", Map.of("type",
+                    request.thinking() == LlmRequest.ThinkingMode.ENABLED ? "enabled" : "disabled"));
         }
         return body;
     }

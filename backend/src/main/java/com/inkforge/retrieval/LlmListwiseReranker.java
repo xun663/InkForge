@@ -1,5 +1,6 @@
 package com.inkforge.retrieval;
 
+import com.inkforge.common.LlmException;
 import com.inkforge.common.prompt.PromptCatalog;
 import com.inkforge.provider.ChatMessage;
 import com.inkforge.provider.LlmProvider;
@@ -55,9 +56,16 @@ public class LlmListwiseReranker implements Reranker {
                 "query", query,
                 "candidates", renderCandidates(input)));
 
-        LlmResponse response = llmProvider.complete(new LlmRequest(
-                List.of(ChatMessage.system(system), ChatMessage.user(user)),
-                512, 0.0, llmProvider.defaultModel(), TaskType.RERANK));
+        LlmResponse response;
+        try {
+            response = llmProvider.complete(new LlmRequest(
+                    List.of(ChatMessage.system(system), ChatMessage.user(user)),
+                    512, 0.0, llmProvider.defaultModel(), TaskType.RERANK));
+        } catch (LlmException e) {
+            // Rerank 是可选增强：任何 LLM 失败（网络/空 content）都转 RerankException，
+            // 由 HybridRetrievalService 回退 fusion 排名，绝不阻断检索。
+            throw new RerankException("Rerank 调用失败: " + e.getMessage());
+        }
 
         int[] numbers = parseNumbers(response.content());
         List<RetrievalResult> ordered = new ArrayList<>();

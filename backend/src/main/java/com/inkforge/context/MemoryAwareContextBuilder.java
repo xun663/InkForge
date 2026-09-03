@@ -193,12 +193,16 @@ public class MemoryAwareContextBuilder implements ContinuationContextBuilder {
         if (tokenBudget <= 0) {
             return "";
         }
+        if ("retrieved-memory".equals(key)) {
+            // P5-B3-0: retrieved-memory 用 rank-preserving 保序选择（改前 fitTail 是"裁头保尾"，
+            // 与"检索结果高分在前"矛盾，会把高排名 Gold 裁掉）。其他 section 不受影响。
+            return renderRetrievedMemory(retrieved, tokenBudget);
+        }
         String content = switch (key) {
             case "breakpoint-text" -> "【断点章节原文】\n" + novel.lastChapter().content();
             case "breakpoint-memory" -> renderBreakpointMemory(novel);
             case "current-facts" -> renderCurrentFacts(novel);
             case "recent-events" -> renderRecentEvents(novel);
-            case "retrieved-memory" -> renderRetrievedMemory(retrieved);
             case "recent-chapters" -> renderRecentChapters(novel);
             case "fact-history" -> renderFactHistory(novel);
             case "older-summaries" -> renderOlderSummaries(novel);
@@ -212,21 +216,54 @@ public class MemoryAwareContextBuilder implements ContinuationContextBuilder {
         String header = newline > 0 ? content.substring(0, newline) : "";
         String body = newline > 0 ? content.substring(newline + 1) : content;
         String headerText = header.isEmpty() ? "" : header + "\n";
-        String fitted = fitTail(body, tokenBudget - tokenCounter.count(headerText));
+        String fitted = fitTail(body, tokenBudget - tokenCounter.count(headerText), tokenCounter);
         return headerText + fitted;
     }
 
-    /** P3-E: retrieved memory section — empty when retrieval failed or found nothing. */
-    private String renderRetrievedMemory(RetrievedMemory retrieved) {
+    /**
+     * P5-B3-0: retrieved-memory 区段，rank-preserving 保序选择。
+     * 检索结果已是"高分在前"（{@code DefaultRetrievedMemoryProvider} 按 score 降序），这里按 rank
+     * 从 1 起依次加入；下一个放不下就停，不删前面已加入的高排名证据。首个即使超预算也保留
+     * （交由 {@link #fitTail} 兜底裁到预算内，避免"超长单条被整条丢弃"）。
+     */
+    private String renderRetrievedMemory(RetrievedMemory retrieved, int tokenBudget) {
         if (retrieved == null || retrieved.results().isEmpty()) {
             return "";
         }
-        StringBuilder sb = new StringBuilder("【检索到的相关记忆】");
-        for (RetrievalResult result : retrieved.results()) {
-            sb.append("\n· 第").append(result.chapterOrdinal() + 1).append("章 · [")
-                    .append(result.memoryType()).append("] ").append(result.text());
+        String headerText = "【检索到的相关记忆】\n";
+        int bodyBudget = Math.max(0, tokenBudget - tokenCounter.count(headerText));
+        if (bodyBudget <= 0) {
+            return "";
         }
-        return sb.toString();
+        String body = rankPreservingRetrievedBody(retrieved.results(), bodyBudget, tokenCounter);
+        return headerText + body;
+    }
+
+    /** rank-preserving 选择逻辑（static、可测）：保序累加，放不下即停。 */
+    static String rankPreservingRetrievedBody(List<RetrievalResult> results, int bodyTokenBudget,
+                                              TokenCounter tokenCounter) {
+        if (results == null || results.isEmpty() || bodyTokenBudget <= 0) {
+            return "";
+        }
+        StringBuilder acc = new StringBuilder();
+        boolean first = true;
+        for (RetrievalResult r : results) {
+            String unit = "\n· 第" + (r.chapterOrdinal() + 1) + "章 · [" + r.memoryType() + "] "
+                    + (r.text() == null ? "" : r.text());
+            String piece = first ? unit.substring(1) : unit;
+            if (first) {                 // 最高排名必须保留（超预算由 fitTail 兜底）
+                acc.append(piece);
+                first = false;
+                continue;
+            }
+            String cand = acc + piece;
+            if (tokenCounter.count(cand) <= bodyTokenBudget) {
+                acc = new StringBuilder(cand);
+            } else {
+                break;                   // 放不下 → 停，保序保前面的高排名证据
+            }
+        }
+        return fitTail(acc.toString(), bodyTokenBudget, tokenCounter);
     }
 
     private String renderBreakpointMemory(Novel novel) {
@@ -349,7 +386,7 @@ public class MemoryAwareContextBuilder implements ContinuationContextBuilder {
     }
 
     /** Keeps the tail of the content that fits the budget, prefixed with an omission marker when cut. */
-    private String fitTail(String content, int tokenBudget) {
+    static String fitTail(String content, int tokenBudget, TokenCounter tokenCounter) {
         String tail = content;
         while (tokenCounter.count(OMITTED_MARK + tail) > tokenBudget && tail.length() > 0) {
             tail = tail.substring(Math.max(1, tail.length() / 10));

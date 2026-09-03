@@ -145,6 +145,8 @@ export INKFORGE_LLM_MODEL=qwen3:14b
 
 可选配置（`backend/src/main/resources/application.yml`）：`inkforge.context.context-max-tokens`（默认 8192，仅为配置默认值）、`inkforge.generation.max-output-tokens`（默认 2048）、`inkforge.retrieval.*`（bm25/vector/fusion/rerank top-k、rrf-k、reranker）、`inkforge.memory.*`（提取预算与窗口）、`inkforge.cost.prices`（成本估算表）。
 
+> Memory Extraction / Rerank 默认使用 **non-thinking 模式**（对支持 thinking 的模型，如 DeepSeek V4），以获得更稳定、低漂移的结构化输出。
+
 可选持久化（PostgreSQL + pgvector）：
 
 ```bash

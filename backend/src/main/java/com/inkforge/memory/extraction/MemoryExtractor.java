@@ -10,6 +10,8 @@ import com.inkforge.provider.LlmRequest;
 import com.inkforge.provider.LlmResponse;
 import com.inkforge.provider.LlmUsage;
 import com.inkforge.provider.TaskType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -28,6 +30,8 @@ import java.util.Map;
  */
 @Component
 public class MemoryExtractor {
+
+    private static final Logger log = LoggerFactory.getLogger(MemoryExtractor.class);
 
     private static final String SYSTEM_TEMPLATE = "memory.extraction.txt";
     private static final String USER_TEMPLATE = "memory.extraction.user.txt";
@@ -64,6 +68,7 @@ public class MemoryExtractor {
         LlmUsage totalUsage = new LlmUsage(0, 0);
         String lastError = null;
 
+        int inputIndex = 0;
         for (String input : inputs) {
             ChapterExtractionResult parsed = null;
             String systemPrompt = promptCatalog.render(SYSTEM_TEMPLATE, Map.of(
@@ -82,6 +87,8 @@ public class MemoryExtractor {
                             TaskType.MEMORY_EXTRACTION));
                     totalUsage = add(totalUsage, response.usage());
                     parsed = parse(response.content());
+                    // [diagnose] 结构统计——不含小说全文与 key，用于定位"提取结果为空"的原因
+                    logExtractDiagnose(chapterNoText, inputIndex, inputs.size(), input, parsed);
                     // structural validation — throws and triggers a repair retry
                     validator.validate(parsed, chapter.content(), properties.sourceQuoteMaxChars());
                     break;
@@ -105,6 +112,7 @@ public class MemoryExtractor {
             quotesValidated += validation.quotesValidated();
             quotesRejected += validation.quotesRejected();
             results.add(validation.cleaned());
+            inputIndex++;
         }
 
         ChapterExtractionResult merged = merge(results);
@@ -201,6 +209,28 @@ public class MemoryExtractor {
         }
         json = json.substring(firstBrace, lastBrace + 1);
         return objectMapper.readValue(json, ChapterExtractionResult.class);
+    }
+
+    /**
+     * [diagnose] 只记结构统计，帮助定位"deepseek 返回了但提取结果为 0"的原因：
+     * 是返回空 characters，还是返回了 facts 但 sourceQuote 缺失被校验器静默丢弃。
+     * 不记录小说全文、不记录 API Key、只截断很小的结构信息。
+     */
+    private void logExtractDiagnose(String chapterNoText, int inputIndex, int totalInputs,
+                                    String input, ChapterExtractionResult parsed) {
+        try {
+            int facts = parsed.characters().stream().mapToInt(c -> c.facts().size()).sum();
+            long nullQuotes = parsed.characters().stream()
+                    .flatMap(c -> c.facts().stream())
+                    .filter(f -> f.sourceQuote() == null || f.sourceQuote().isBlank())
+                    .count();
+            log.info("[extract-diagnose] chapter={} input={}/{} inputChars={} "
+                            + "parsedCharacters={} parsedFacts={} nullSourceQuote={} parsedEvents={}",
+                    chapterNoText, inputIndex + 1, totalInputs, input.length(),
+                    parsed.characters().size(), facts, nullQuotes, parsed.events().size());
+        } catch (Exception ignore) {
+            // 诊断日志失败不影响提取流程
+        }
     }
 
     private static LlmUsage add(LlmUsage a, LlmUsage b) {

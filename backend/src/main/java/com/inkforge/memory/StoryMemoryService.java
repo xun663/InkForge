@@ -84,37 +84,48 @@ public class StoryMemoryService {
 
         List<MemoryExtractionRecord> records = new ArrayList<>();
         for (Chapter chapter : targets) {
-            MemoryExtractor.ExtractionOutcome outcome =
-                    extractor.extract(chapter, display(chapter));
-            if (outcome.result() != null) {
-                updateService.apply(novelId, chapter, outcome.result());
-                // P3-B projection hook (idempotent); projection failure must never
-                // break Story Memory or the extraction flow
-                try {
-                    projectionService.projectChapter(novelId, chapter.ordinal());
-                } catch (Exception e) {
-                    log.warn("MemoryChunk 投影失败（不影响故事记忆）: novelId={}, ordinal={}",
-                            novelId, chapter.ordinal(), e);
-                }
-                // Vector 接线：投影成功后为新增 chunk 生成 embedding（幂等，只处理缺失/内容变化的）。
-                // embedding 失败绝不影响提取 / 投影 / 续写 / SSE done。
-                try {
-                    embeddingService.embedNovel(novelId);
-                } catch (Exception e) {
-                    log.warn("MemoryChunk embedding 失败（不影响故事记忆与续写）: novelId={}",
-                            novelId, e);
-                }
-            }
-            MemoryExtractionRecord record = new MemoryExtractionRecord(
-                    novelId, chapter.ordinal(),
-                    outcome.result() != null ? "SUCCESS" : "FAILED",
-                    outcome.errorMessage(), llmProvider.defaultModel(),
-                    outcome.stats(), Instant.now());
-            memoryRepository.saveExtractionRecord(record);
-            records.add(record);
-            logExtractionCost(novelId, chapter, outcome);
+            records.add(buildChapter(novelId, chapter));
         }
         return records;
+    }
+
+    /**
+     * 单章处理（P5-A：全量 Memory Build Job 与 recent-window 共用）：
+     * extract → apply → project → embed → save record。返回 extraction record（SUCCESS/FAILED）。
+     *
+     * <p>幂等约束：只有 extract+apply 全部成功才记 SUCCESS；同一章已有 SUCCESS 时调用方必须跳过
+     * （Event 是 append-only 语义，绝不能对已 SUCCESS 的章节重复 apply）。
+     */
+    public MemoryExtractionRecord buildChapter(String novelId, Chapter chapter) {
+        MemoryExtractor.ExtractionOutcome outcome =
+                extractor.extract(chapter, display(chapter));
+        if (outcome.result() != null) {
+            updateService.apply(novelId, chapter, outcome.result());
+            // P3-B projection hook (idempotent); projection failure must never
+            // break Story Memory or the extraction flow
+            try {
+                projectionService.projectChapter(novelId, chapter.ordinal());
+            } catch (Exception e) {
+                log.warn("MemoryChunk 投影失败（不影响故事记忆）: novelId={}, ordinal={}",
+                        novelId, chapter.ordinal(), e);
+            }
+            // Vector 接线：投影成功后为新增 chunk 生成 embedding（幂等，只处理缺失/内容变化的）。
+            // embedding 失败绝不影响提取 / 投影 / 续写 / SSE done。
+            try {
+                embeddingService.embedNovel(novelId);
+            } catch (Exception e) {
+                log.warn("MemoryChunk embedding 失败（不影响故事记忆与续写）: novelId={}",
+                        novelId, e);
+            }
+        }
+        MemoryExtractionRecord record = new MemoryExtractionRecord(
+                novelId, chapter.ordinal(),
+                outcome.result() != null ? "SUCCESS" : "FAILED",
+                outcome.errorMessage(), llmProvider.defaultModel(),
+                outcome.stats(), Instant.now());
+        memoryRepository.saveExtractionRecord(record);
+        logExtractionCost(novelId, chapter, outcome);
+        return record;
     }
 
     public MemoryOverview overview(String novelId) {

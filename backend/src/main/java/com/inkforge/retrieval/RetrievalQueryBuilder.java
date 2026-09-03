@@ -28,9 +28,18 @@ public class RetrievalQueryBuilder {
     private static final int PRIMARY_SUMMARY_CHARS = 200;
 
     private final StoryMemoryRepository memoryRepository;
+    private final QueryIntentClassifier intentClassifier;
 
-    public RetrievalQueryBuilder(StoryMemoryRepository memoryRepository) {
+    /** Spring：注入确定性意图分类器（P5-B1）。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    public RetrievalQueryBuilder(StoryMemoryRepository memoryRepository, QueryIntentClassifier intentClassifier) {
         this.memoryRepository = memoryRepository;
+        this.intentClassifier = intentClassifier;
+    }
+
+    /** P3 兼容构造（测试用）。 */
+    public RetrievalQueryBuilder(StoryMemoryRepository memoryRepository) {
+        this(memoryRepository, new QueryIntentClassifier());
     }
 
     public List<RetrievalQuery> build(Novel novel) {
@@ -43,7 +52,8 @@ public class RetrievalQueryBuilder {
         String summaryText = summary == null ? "" : truncate(summary.summary(), PRIMARY_SUMMARY_CHARS);
         String primary = joinNonBlank(tail, summaryText);
         if (!primary.isBlank()) {
-            queries.add(new RetrievalQuery("primary", primary));
+            queries.add(new RetrievalQuery("primary", primary,
+                    QueryIntent.RECENT_PLOT, 0, "断点章节尾部 + 摘要"));
         }
 
         // 2. character: 断点摘要出场人物
@@ -56,12 +66,15 @@ public class RetrievalQueryBuilder {
             }
         }
         if (!names.isEmpty()) {
-            queries.add(new RetrievalQuery("character", String.join(" ", names)));
+            queries.add(new RetrievalQuery("character", String.join(" ", names),
+                    QueryIntent.CHARACTER, 1, "断点摘要出场人物"));
         }
 
         // 3. thread: 未解决线索
         if (summary != null && !summary.unresolvedThreads().isEmpty()) {
-            queries.add(new RetrievalQuery("thread", String.join("；", summary.unresolvedThreads())));
+            String threadText = String.join("；", summary.unresolvedThreads());
+            QueryIntent ti = intentClassifier.classify(threadText);
+            queries.add(new RetrievalQuery("thread", threadText, ti, 2, "未解决线索（分类=" + ti + "）"));
         }
 
         return queries;

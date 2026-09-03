@@ -15,7 +15,7 @@ import java.util.Map;
  * Hybrid retrieval (P3-D, single-query version):
  *
  * <pre>
- * query → BM25(top 30) + Vector(top 30) → RRF Fusion(top 30) → Reranker(top 8)
+ * query → BM25(top 30) + Vector(top 30) → RRF Fusion(top 30) → Reranker(top 30)
  * </pre>
  *
  * <p>STRICT degradation (retrieval is an enhancement, never a single point of failure):

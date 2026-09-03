@@ -147,6 +147,88 @@ class MemoryExtractorTest {
     }
 
     @Test
+    void emptyContentRetriesThenFails() {
+        // LLM 返回空 content（provider 兼容性场景）：重试到上限后 FAILED，P2 降级不变
+        LlmProvider alwaysEmpty = new LlmProvider() {
+            @Override
+            public String name() {
+                return "empty";
+            }
+
+            @Override
+            public String defaultModel() {
+                return "empty-model";
+            }
+
+            @Override
+            public Flux<ProviderStreamEvent> stream(LlmRequest request) {
+                return Flux.empty();
+            }
+
+            @Override
+            public LlmResponse complete(LlmRequest request) {
+                return new LlmResponse("", new LlmUsage(1, 1));
+            }
+        };
+
+        MemoryExtractor.ExtractionOutcome outcome = extractorWith(alwaysEmpty, properties)
+                .extract(chapter("正文。"), "第3章");
+
+        assertThat(outcome.result()).isNull();
+        assertThat(outcome.errorMessage()).contains("LLM 返回为空");
+        assertThat(outcome.stats().retries()).isEqualTo(2);
+    }
+
+    @Test
+    void emptyContentThenValidJsonSucceeds() {
+        // 第一次空 content → 重试 → 第二次合法 JSON → SUCCESS
+        LlmProvider flaky = new LlmProvider() {
+            private int calls;
+
+            @Override
+            public String name() {
+                return "flaky-empty";
+            }
+
+            @Override
+            public String defaultModel() {
+                return "flaky-model";
+            }
+
+            @Override
+            public Flux<ProviderStreamEvent> stream(LlmRequest request) {
+                return Flux.empty();
+            }
+
+            @Override
+            public LlmResponse complete(LlmRequest request) {
+                calls++;
+                if (calls == 1) {
+                    return new LlmResponse("", new LlmUsage(1, 1));
+                }
+                String quote = firstSentenceOfChapter(request);
+                String json = """
+                        {"summary": {"summary": "重试后成功", "keyEvents": [], "characters": [],
+                          "locations": [], "importantItems": [], "unresolvedThreads": []},
+                         "characters": [{"name": "林默", "aliases": [],
+                          "facts": [{"category": "STATE", "attribute": "当前状态", "value": "受伤",
+                                     "targetCharacter": null, "confidence": 0.9, "sourceQuote": "%s"}]}],
+                         "events": []}
+                        """.formatted(quote);
+                return new LlmResponse(json, new LlmUsage(2, 2));
+            }
+        };
+
+        MemoryExtractor.ExtractionOutcome outcome = extractorWith(flaky, properties)
+                .extract(chapter("林默与血魔在后山对峙，右手受伤。"), "第3章");
+
+        assertThat(outcome.errorMessage()).isNull();
+        assertThat(outcome.result()).isNotNull();
+        assertThat(outcome.result().characters()).hasSize(1);
+        assertThat(outcome.stats().retries()).isEqualTo(1);
+    }
+
+    @Test
     void budgetSmallerThanFixedOverheadIsRejected() {
         MemoryExtractionProperties tiny = new MemoryExtractionProperties(
                 3, 100, 0, 2048, 0.2, 0, 0.7, 300, 200);

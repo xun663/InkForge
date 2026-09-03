@@ -28,7 +28,7 @@ public record RetrievalProperties(
             fusionTopK = 30;
         }
         if (rerankTopK <= 0) {
-            rerankTopK = 8;
+            rerankTopK = 30;
         }
         if (rrfK <= 0) {
             rrfK = 60;

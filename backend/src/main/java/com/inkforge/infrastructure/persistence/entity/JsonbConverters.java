@@ -37,6 +37,20 @@ public final class JsonbConverters {
         }
     }
 
+    public static class IntegerListConverter implements AttributeConverter<List<Integer>, String> {
+
+        @Override
+        public String convertToDatabaseColumn(List<Integer> attribute) {
+            return write(attribute);
+        }
+
+        @Override
+        public List<Integer> convertToEntityAttribute(String dbData) {
+            return read(dbData, new TypeReference<List<Integer>>() {
+            });
+        }
+    }
+
     public static class SummaryCharacterListConverter
             implements AttributeConverter<List<SummaryCharacter>, String> {
 

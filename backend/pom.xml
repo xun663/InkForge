@@ -142,6 +142,8 @@
 					<excludes>
 						<!-- 真实 LLM 成本 harness，必须 -Dtest='GzrFullMemoryCostRun#方法名' 才跑 -->
 						<exclude>**/GzrFullMemoryCostRun.java</exclude>
+						<!-- 依赖本机 BGE :8085，CI / 默认 mvn test 不跑 -->
+						<exclude>**/EmbeddingAblationTest.java</exclude>
 					</excludes>
 				</configuration>
 			</plugin>

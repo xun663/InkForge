@@ -30,7 +30,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "inkforge.llm.provider=mock",
         "inkforge.llm.mock.delay-ms=0",
-        "inkforge.embedding.provider=mock"})
+        "inkforge.embedding.provider=mock",
+        "inkforge.gzr.source-txt=",
+        "inkforge.gzr.outcomes-dir="})
 @AutoConfigureMockMvc
 class OutcomeReplayControllerTest {
 

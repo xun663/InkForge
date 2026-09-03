@@ -1,0 +1,8 @@
+# "postgres" profile: real persistence via PostgreSQL + pgvector.
+# Activate with: --spring.profiles.active=postgres  (see docker-compose.yml at repo root)
+# The DEFAULT profile stays InMemory + Mock and never needs a database.
+spring:
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/inkforge}
+    username: ${POSTGRES_USER:inkforge}
+    password: ${POSTGRES_PASSWORD:inkforge}

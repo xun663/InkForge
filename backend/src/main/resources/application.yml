@@ -1,0 +1,103 @@
+spring:
+  application:
+    name: inkforge-backend
+  autoconfigure:
+    exclude:
+      # SB4 ships JDBC/JPA auto-config in dedicated modules; the DEFAULT profile must stay
+      # database-free (InMemory repositories, zero Docker). The "postgres" profile uses
+      # explicit beans in PostgresConfig and does not rely on auto-configuration at all.
+      - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 105MB
+
+server:
+  port: 8080
+
+inkforge:
+  embedding:
+    # Default is mock (zero API key, deterministic pseudo-vectors for pipeline tests only —
+    # NOT semantic quality). Real embeddings: any OpenAI-compatible /embeddings endpoint
+    # (e.g. SiliconFlow bge-m3), model/base-url/api-key configured below. DeepSeek is
+    # deliberately not an embedding provider.
+    provider: ${INKFORGE_EMBEDDING_PROVIDER:mock}
+    model: ${INKFORGE_EMBEDDING_MODEL:bge-m3}
+    base-url: ${INKFORGE_EMBEDDING_BASE_URL:https://api.siliconflow.cn/v1}
+    api-key: ${INKFORGE_EMBEDDING_API_KEY:}
+    # DIMENSION INVARIANT: must equal the provider dimension and the Flyway schema
+    # vector(1024). Any mismatch fails loudly (startup guard + provider validation),
+    # never silently truncated or padded.
+    dimension: 1024
+    batch-size: 16
+    timeout-seconds: 120
+  import:
+    # Resource protection limits for the IMPORT layer — defensive guards, not normal-path
+    # limits, and fully decoupled from the LLM extraction budget. Import is always
+    # 文件 → Chapter → per-chapter Memory extraction; the whole novel is never sent to an LLM.
+    max-file-size: 104857600    # 100MB (长篇网文如《蛊真人》可达数百万字/数十MB)
+    max-chapters: 10000
+    max-chapter-chars: 100000
+  llm:
+    # Default provider is "mock": the full Phase 1 flow works without any API key.
+    # Switch to "deepseek" / "openai" / "ollama" / "openai-compatible" via env vars, see README.
+    provider: ${INKFORGE_LLM_PROVIDER:mock}
+    base-url: ${INKFORGE_LLM_BASE_URL:https://api.deepseek.com}
+    # API key MUST come from the environment, never from source code or committed config.
+    api-key: ${INKFORGE_LLM_API_KEY:}
+    model: ${INKFORGE_LLM_MODEL:deepseek-chat}
+    timeout-seconds: 300
+    mock:
+      # Streaming delay per chunk for demo effect; tests override to 0.
+      delay-ms: 0
+  context:
+    # Phase 1 defaults — values are configuration, never hardcoded into the design.
+    context-max-tokens: 8192
+    breakpoint-tail-chars: 2000
+    # Section allocation rules. required = "prioritize", NOT "may overflow":
+    # totalTokens <= context-max-tokens is always the supreme invariant.
+    sections:
+      breakpoint-text:    { priority: 1, required: true,  min-tokens: 2048, max-tokens: 4096 }
+      breakpoint-memory:  { priority: 2, required: true,  min-tokens: 128,  max-tokens: 1024 }
+      current-facts:      { priority: 3, required: false, min-tokens: 0,    max-tokens: 1024 }
+      recent-events:      { priority: 4, required: false, min-tokens: 0,    max-tokens: 768 }
+      retrieved-memory:   { priority: 5, required: false, min-tokens: 0,    max-tokens: 1024 }
+      recent-chapters:    { priority: 6, required: false, min-tokens: 0,    max-tokens: 1280 }
+      fact-history:       { priority: 7, required: false, min-tokens: 0,    max-tokens: 512 }
+      older-summaries:    { priority: 8, required: false, min-tokens: 0,    max-tokens: 256 }
+  generation:
+    max-output-tokens: 2048
+    temperature: 0.8
+  retrieval:
+    # P3-D Hybrid Retrieval: BM25(top K) + Vector(top K) → RRF(k) → Reranker(top K).
+    # reranker: passthrough (default, deterministic, zero-LLM) | llm (optional, Mock works).
+    bm25-top-k: 30
+    vector-top-k: 30
+    fusion-top-k: 30
+    rerank-top-k: 8
+    rrf-k: 60
+    reranker: ${INKFORGE_RERANKER:passthrough}
+    rerank-max-candidates: 15
+    rerank-candidate-max-chars: 200
+  memory:
+    # Story Memory (Phase 2). All values are configuration, never hardcoded into logic.
+    extract-window: 3
+    # INPUT budget of one extraction call — NOT the model's full context window.
+    # The extractor reserves system prompt + schema + user template + reserved output tokens
+    # before deciding how much chapter text fits.
+    extraction-input-budget: 12000
+    extraction-reserved-output-tokens: 2048
+    extraction-max-output-tokens: 2048
+    extraction-temperature: 0.2
+    max-retries: 2
+    confirm-confidence: 0.7
+    source-quote-max-chars: 300
+    chunk-overlap-chars: 200
+  cost:
+    # Price per 1M tokens, USD. Used only for cost estimation display.
+    # Keep in sync with official provider pricing pages.
+    prices:
+      deepseek-chat:
+        input-usd-per-1m: 0.27
+        output-usd-per-1m: 1.10

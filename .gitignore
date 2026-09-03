@@ -1,0 +1,29 @@
+# --- Java / Maven (backend) ---
+**/target/
+*.class
+!.mvn/wrapper/maven-wrapper.jar
+
+# --- Node (frontend) ---
+frontend/node_modules/
+frontend/dist/
+npm-debug.log*
+yarn-error.log*
+
+# --- Environment / secrets (API keys must never be committed) ---
+.env
+.env.*
+!.env.example
+
+# --- IDE ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+
+# --- OS ---
+.DS_Store
+Thumbs.db

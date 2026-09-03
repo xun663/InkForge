@@ -1,0 +1,19 @@
+# InkForge dev database (optional). The default run path needs NO database and NO Docker;
+# this compose file is only for the "postgres" profile / Testcontainers-verified setup.
+#
+#   docker compose up -d
+#   cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: inkforge
+      POSTGRES_USER: inkforge
+      POSTGRES_PASSWORD: inkforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata: {}

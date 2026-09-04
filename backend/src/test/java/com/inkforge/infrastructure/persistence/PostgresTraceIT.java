@@ -4,14 +4,17 @@ import com.inkforge.retrieval.MemoryChunkType;
 import com.inkforge.retrieval.RetrievalResult;
 import com.inkforge.retrieval.RetrievalTrace;
 import com.inkforge.retrieval.RetrievalTraceRepository;
+import com.inkforge.novel.NovelRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 
 import java.time.Instant;
 import java.util.List;
@@ -23,19 +26,35 @@ import static org.assertj.core.api.Assertions.assertThat;
  * P3-G 补齐的 Trace 持久化 IT（postgres profile）：queries/pipeline JSONB 往返、
  * generationId 关联、按 novel 查询。Docker 不可用时自动 skipped。
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.NONE,
+        properties = {
+                "inkforge.llm.provider=mock",
+                "inkforge.embedding.provider=mock"})
 @ActiveProfiles("postgres")
 @Testcontainers(disabledWithoutDocker = true)
 class PostgresTraceIT {
 
     @Container
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("pgvector/pgvector:pg17");
+    static PostgreSQLContainer<?> postgres = PostgresITSupport.postgres();
+
+    @DynamicPropertySource
+    static void datasource(DynamicPropertyRegistry registry) {
+        PostgresITSupport.registerDatasource(postgres, registry);
+    }
 
     @Autowired
     private RetrievalTraceRepository traceRepository;
 
+    @Autowired
+    private NovelRepository novelRepository;
+
     private static final Instant NOW = Instant.parse("2026-08-17T00:00:00Z");
+
+    @BeforeEach
+    void hostNovel() {
+        PostgresITSupport.saveNovel(novelRepository, "n1");
+    }
 
     @Test
     void traceRoundTripsThroughPostgres() {

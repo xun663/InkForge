@@ -23,6 +23,16 @@ jobs:
       # Testcontainers 集成测试在 CI（有 Docker）下会真实执行；本地无 Docker 时自动 skipped
       # 高成本 harness（GzrFullMemoryCostRun）不匹配 *Test/*IT，不会进默认 surefire
       - run: ./mvnw test
+        env:
+          # Ryuk 在部分 GitHub runner 上会拖垮/误杀容器；IT 自己管生命周期
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+      - name: Upload surefire reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-surefire-reports
+          path: backend/target/surefire-reports/
+          if-no-files-found: ignore
 
   frontend-build:
     name: Frontend build

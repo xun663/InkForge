@@ -15,10 +15,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -34,14 +35,22 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * P6 planning layer PostgreSQL integration（V5 迁移 + 双仓储）。
  * WITHOUT Docker these are SKIPPED automatically (disabledWithoutDocker)。
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.NONE,
+        properties = {
+                "inkforge.llm.provider=mock",
+                "inkforge.embedding.provider=mock"})
 @ActiveProfiles("postgres")
 @Testcontainers(disabledWithoutDocker = true)
 class PostgresPlanningIT {
 
     @Container
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("pgvector/pgvector:pg17");
+    static PostgreSQLContainer<?> postgres = PostgresITSupport.postgres();
+
+    @DynamicPropertySource
+    static void datasource(DynamicPropertyRegistry registry) {
+        PostgresITSupport.registerDatasource(postgres, registry);
+    }
 
     @Autowired
     private StoryPlanRepository storyPlanRepository;

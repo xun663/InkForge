@@ -20,12 +20,30 @@ jobs:
           cache: maven
       # Windows 提交的 mvnw 可能没有可执行位；Linux runner 上 ./mvnw 会秒失败
       - run: chmod +x mvnw
-      # Testcontainers 集成测试在 CI（有 Docker）下会真实执行；本地无 Docker 时自动 skipped
-      # 高成本 harness（GzrFullMemoryCostRun）不匹配 *Test/*IT，不会进默认 surefire
+      # 默认 surefire = 单测 + ContinuationRetrievalIT（无 Docker）。Postgres*IT 不进徽章。
       - run: ./mvnw test
-        env:
-          # Ryuk 在部分 GitHub runner 上会拖垮/误杀容器；IT 自己管生命周期
-          TESTCONTAINERS_RYUK_DISABLED: "true"
+      - name: Annotate failing tests
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          found = False
+          for p in sorted(glob.glob("target/surefire-reports/TEST-*.xml")):
+              root = ET.parse(p).getroot()
+              for tc in root.iter("testcase"):
+                  node = tc.find("failure")
+                  if node is None:
+                      node = tc.find("error")
+                  if node is None:
+                      continue
+                  found = True
+                  cls = tc.get("classname") or "?"
+                  name = tc.get("name") or "?"
+                  msg = (node.get("message") or (node.text or "failed")).replace("\n", " ")[:350]
+                  print(f"::error title={cls}.{name}::{msg}")
+          if not found:
+              print("::error::mvn test failed but no surefire failure/error XML was found")
+          PY
       - name: Upload surefire reports
         if: failure()
         uses: actions/upload-artifact@v4

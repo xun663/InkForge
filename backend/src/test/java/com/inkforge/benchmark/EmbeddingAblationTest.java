@@ -25,6 +25,7 @@ import com.inkforge.retrieval.RetrievalResult;
 import com.inkforge.retrieval.RrfFusion;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.web.reactive.function.client.WebClient;
 import tools.jackson.databind.ObjectMapper;
 
@@ -45,7 +46,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>前置：本地 bge-m3 服务需在 localhost:8085 运行（bge_m3_server.py）。
  * 检索全部走生产类；不修改任何生产实现。结果写入 target/e2e/embedding-ablation/retrieval/。
+ * 默认 mvn test / CI 不跑；需要时设 INKFORGE_RUN_BGE_ABLATION=true。
  */
+@EnabledIfEnvironmentVariable(named = "INKFORGE_RUN_BGE_ABLATION", matches = "true")
 class EmbeddingAblationTest {
 
     private static final int BM25_TOP = 30;

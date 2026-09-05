@@ -132,8 +132,9 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
-					<!-- Integration tests (*IT) run alongside unit tests; without Docker
-					     they are SKIPPED (Testcontainers disabledWithoutDocker) and reported. -->
+					<!-- Default mvn test = InMemory + Mock path (what CI and local no-Docker share).
+					     Postgres*IT need Docker + a live pgvector; run them explicitly:
+					     ./mvnw test -Dtest=PostgresPersistenceIT,PostgresVectorIT,PostgresPlanningIT,PostgresTraceIT -->
 					<includes>
 						<include>**/*Test.java</include>
 						<include>**/*Tests.java</include>
@@ -144,6 +145,8 @@
 						<exclude>**/GzrFullMemoryCostRun.java</exclude>
 						<!-- 依赖本机 BGE :8085，CI / 默认 mvn test 不跑 -->
 						<exclude>**/EmbeddingAblationTest.java</exclude>
+						<!-- CI 有 Docker 但默认徽章只验收无库路径；Postgres IT 单独跑 -->
+						<exclude>**/Postgres*IT.java</exclude>
 					</excludes>
 				</configuration>
 			</plugin>

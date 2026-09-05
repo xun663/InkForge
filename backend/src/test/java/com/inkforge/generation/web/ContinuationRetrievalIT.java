@@ -36,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class ContinuationRetrievalIT {
 
-    private static final Pattern DONE_DATA = Pattern.compile("event:done\\ndata:(.+)", Pattern.MULTILINE);
+    private static final Pattern DONE_DATA = Pattern.compile("event:done\\r?\\ndata:(.+)", Pattern.MULTILINE);
 
     @Autowired
     private MockMvc mockMvc;

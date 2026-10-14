@@ -5,7 +5,7 @@
 **Long-Form AI Story Continuation & Narrative Memory Engine**
 面向长文本生成的 AI 小说续写与叙事记忆系统
 
-InkForge 不是"调用 LLM API 生成小说"。它解决的核心问题是：
+InkForge 它解决的核心问题是：
 
 > 一部长篇小说（数十万到数百万字）无法完整放入 LLM Context 时，AI 如何**记住**几百章以前的剧情、**检索**出当前真正相关的历史、在有限 Context 下**决定**什么值得进入 Prompt，并**验证**生成内容与原著不冲突。
 
